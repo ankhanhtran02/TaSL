@@ -1,0 +1,6 @@
+__pycache__/
+checkpoint_files/*
+ipt_file/*
+logs/*
+wandb/*
+outputs/*
