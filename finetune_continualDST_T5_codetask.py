@@ -169,8 +169,8 @@ def main(args):
     
     model_name = args.model_path.split("/")[-1]
     training_args = Seq2SeqTrainingArguments(
-        evaluation_strategy = "steps",
-        save_strategy="steps",
+        evaluation_strategy = "epoch",
+        save_strategy="epoch",
         learning_rate = 3e-4,
         warmup_steps=50,
         per_device_train_batch_size = args.train_batch_size,
@@ -178,15 +178,13 @@ def main(args):
         weight_decay = 0.01,
         save_total_limit =2,
         load_best_model_at_end=True,
-        eval_steps=5,  # 500
-        save_steps=5,  # 500
         output_dir=checkpoint_dir,
         num_train_epochs = args.num_epochs,
         predict_with_generate = True,
         # fp16 = True,
         push_to_hub = False,
         # logging_dir=log_dir,
-        logging_steps=5, # 10
+        logging_steps=10, # 10
         report_to=["wandb"],
         resume_from_checkpoint=resume_from_checkpoint,
     )
