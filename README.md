@@ -17,6 +17,11 @@ Change directory to root:
 cp -i /workspace/TaSL/trainer_seq2seq.py /venv/TaSL/lib/python3.8/site-packages/transformers/trainer_seq2seq.py
 ```
 
+Export Wandb API key as environment variable:
+```
+export WANDB_API_KEY="[YOUR API KEY]"
+```
+
 ## Step 2. Training (TaSL)
 To finetune on CodeTask-CL datasets:
 ```ruby
