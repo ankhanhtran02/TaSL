@@ -13,8 +13,8 @@ do
         --val_size 100 \
         --task_list CONCODE CodeTrans CodeSearchNet BFP \
         --service_begin_id=${ORDER} \
-        --train_batch_size 8 \
-        --eval_batch_size 8 \
+        --train_batch_size 32 \
+        --eval_batch_size 32 \
 
     wait
 

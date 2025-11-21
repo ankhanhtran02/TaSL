@@ -195,7 +195,7 @@ class T5Dataset:
                                                                             max_length_target=target_len,
                                                                             ),
                                                                             batched=False,
-                                                                            load_from_cache_file=False
+                                                                            load_from_cache_file=True
                                                                             )
             encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
             encoded_dataset = encoded_dataset.remove_columns([col for col in dataset.column_names if col not in ['input_ids', 'attention_mask', 'labels']])
@@ -214,7 +214,7 @@ class T5Dataset:
                                                                                     max_length=max_length,
                                                                                     ),
                                                                                     batched=False,
-                                                                                    load_from_cache_file=False
+                                                                                    load_from_cache_file=True
                                                                                     )
                     encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
                     encoded_dataset = encoded_dataset.remove_columns([col for col in dataset.column_names if col not in ['input_ids', 'attention_mask', 'labels']])
