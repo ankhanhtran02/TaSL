@@ -25,5 +25,5 @@ export WANDB_API_KEY="[YOUR API KEY]"
 ## Step 2. Training (TaSL)
 To finetune on CodeTask-CL datasets:
 ```ruby
-./scripts/run_train_TaSL_t5_codetask.sh
+scripts/run_train_TaSL_T5_codetask.sh
 ```
