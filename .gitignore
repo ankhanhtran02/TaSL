@@ -4,3 +4,5 @@ ipt_file/*
 logs/*
 wandb/*
 outputs/*
+results/*
+draft.py

@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 import os
 import re
-
+import csv
 #os.environ['CUDA_VISIBLE_DEVICES'] = "5"
 import sys
 from peft import PeftModel
@@ -136,32 +136,35 @@ def main(args):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         print(f"create {output_dir} folder")
-    output_fn = os.path.join(output_dir, "val.predictions")
-    gold_fn = os.path.join(output_dir, "val.gold")
-    def compute_metrics(eval_preds):
-        preds, labels = eval_preds
-        labels[labels == -100] = tokenizer.pad_token_id
-        preds[preds == -100] = tokenizer.pad_token_id
-        decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
-        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-        predictions = []
-        with open(output_fn, 'w') as f, open(gold_fn, 'w') as f1:
-            for id, (pred_nl, gold) in enumerate(zip(decoded_preds, decoded_labels)):
-                if task in ['CodeSearchNet']:
-                    # for smooth-bleu4 evaluation
-                    predictions.append(str(id) + '\t' + pred_nl)
-                    f.write(str(id) + '\t' + repr(pred_nl.strip()) + '\n')
-                    f1.write(str(id) + '\t' + repr(gold.strip()) + '\n')
-                else:
-                    f.write(repr(pred_nl.strip()) + '\n')
-                    f1.write(repr(gold.strip()) + '\n')
-        if task == 'CodeSearchNet':
-            (goldMap, predictionMap) = smooth_bleu.computeMaps(predictions, gold_fn)
-            bleu = round(smooth_bleu.bleuFromMaps(goldMap, predictionMap)[0], 2)
-        else:
-            bleu = round(_bleu(gold_fn, output_fn), 2)
-        result = {"bleu": bleu,}
-        return result
+
+    def compute_metrics_wrapper(tokenizer, fname, output_dir):
+        output_fn = os.path.join(output_dir, f"{fname}.output")
+        gold_fn = os.path.join(output_dir, f"{fname}.gold")
+        def compute_metrics(eval_preds):
+            preds, labels = eval_preds
+            labels[labels == -100] = tokenizer.pad_token_id
+            preds[preds == -100] = tokenizer.pad_token_id
+            decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+            decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+            predictions = []
+            with open(output_fn, 'w') as f, open(gold_fn, 'w') as f1:
+                for id, (pred_nl, gold) in enumerate(zip(decoded_preds, decoded_labels)):
+                    if task in ['CodeSearchNet']:
+                        # for smooth-bleu4 evaluation
+                        predictions.append(str(id) + '\t' + pred_nl)
+                        f.write(str(id) + '\t' + repr(pred_nl.strip()) + '\n')
+                        f1.write(str(id) + '\t' + repr(gold.strip()) + '\n')
+                    else:
+                        f.write(repr(pred_nl.strip()) + '\n')
+                        f1.write(repr(gold.strip()) + '\n')
+            if task == 'CodeSearchNet':
+                (goldMap, predictionMap) = smooth_bleu.computeMaps(predictions, gold_fn)
+                bleu = round(smooth_bleu.bleuFromMaps(goldMap, predictionMap)[0], 2)
+            else:
+                bleu = round(_bleu(gold_fn, output_fn), 2)
+            result = {"bleu": bleu,}
+            return result
+        return compute_metrics
 
     model = AutoModelForSeq2SeqLM.from_pretrained(args.model_path)
     # print(model)
@@ -204,6 +207,8 @@ def main(args):
         beta2=args.beta2, 
     )
     
+    fname = f"val_{task}_train_{task}_per_epoch"
+    calc_metrics = compute_metrics_wrapper(tokenizer, fname, output_dir)
     trainer = Seq2SeqTrainer(
         model,
         training_args,
@@ -212,11 +217,60 @@ def main(args):
         eval_dataset = val_data,
         data_collator = data_collator,
         tokenizer = tokenizer,
-        compute_metrics = compute_metrics
+        compute_metrics = calc_metrics
     )
     
     #resume_from_checkpoint = None
     train_result = trainer.train()
+
+    # Evaluate on all trained tasks
+    all_eval_results = []
+    for task_id in range(service_id + 1):
+        eval_task = dataset_order[task_id]
+        eval_dataset = get_task_data_dict(
+            train_ds_name="CodeTask-CL",
+            benchmark="CodeTask-CL",
+            task=eval_task,
+            tokenizer=tokenizer,
+            seq_len=max_input_length,
+            target_len=max_target_length,
+            split_size_dict={
+                "test": {"size": -1, "batch_size": args.eval_batch_size},
+            }
+        )["test"]
+        fname = f"test_{eval_task}_train_{task}"
+        calc_metrics = compute_metrics_wrapper(tokenizer, fname, output_dir)
+        trainer.compute_metrics = calc_metrics
+        metrics = trainer.evaluate(eval_dataset=eval_dataset)
+
+        # Store the results, potentially renaming keys for clarity (e.g., adding 'task_A_')
+        # Use a dictionary comprehension to prefix the keys with the task name
+        result_dict = {}
+        result_dict["name"] = fname 
+        for k, v in metrics.items():
+            result_dict[k] = v
+        all_eval_results.append(result_dict)
+        
+        print(f"Results for **{eval_task}**:")
+        for metric_name, value in metrics.items():
+            # Display the core metrics for the current task
+            print(f"- {metric_name}: {value:.4f}")
+
+    results_fp = "results/test_run.csv"
+    if not os.path.exists("results"):
+        os.makedirs("results", exist_ok=True)
+        print("Created results directory.")
+    if not os.path.exists(results_fp):
+        with open(results_fp, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            header = list(all_eval_results[0].keys())
+            writer.writerow(header)
+        print(f"Result filepath not found. Created {results_fp}")
+    with open(results_fp, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        for result in all_eval_results:
+            row = [result[key] for key in result.keys()]
+            writer.writerow(row)
 
     ipt_name_list, ipt_score_list = rankallocator.calculate_score(metric="ipt")    
     print(ipt_name_list)

@@ -124,8 +124,7 @@ class T5Dataset:
                      k=-1,
                      seed=0,
                      target_len=128,
-                     max_length=128,
-                     k_test=None):
+                     max_length=128):
         """Function that returns final T5 dataloader.
         Args:
             task (str): Name of the downstream task.
@@ -179,101 +178,59 @@ class T5Dataset:
 
         # Selecting k subset of the samples (if requested)
         if k != -1:
-            if split == "train":
-                dataset = self.select_subset_ds(dataset, k=k)
-            else:
-                if k_test is not None and k_test != -1: # if k_test is None, use all the val/test data
-                    k_sum = k + k_test
-                    dataset = self.select_subset_ds(dataset, k=k_sum)
+            dataset = self.select_subset_ds(dataset, k=k)
         dataset = dataset.shuffle(seed=seed)
 
         # Returning the selected data split (train/val/test)
-        if split == "train":
-            encoded_dataset = dataset.map(lambda x: self.preprocess_function(x,
-                                                                            task,
-                                                                            max_length=max_length,
-                                                                            max_length_target=target_len,
-                                                                            ),
-                                                                            batched=False,
-                                                                            load_from_cache_file=True
-                                                                            )
-            encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
-            encoded_dataset = encoded_dataset.remove_columns([col for col in dataset.column_names if col not in ['input_ids', 'attention_mask', 'labels']])
-            return encoded_dataset
+        encoded_dataset = dataset.map(
+            lambda x: self.preprocess_function(
+                x,                                                                        
+                task,
+                max_length=max_length,
+                max_length_target=target_len,
+                ),
+            batched=False,
+            load_from_cache_file=True
+        )
+        encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
+        encoded_dataset = encoded_dataset.remove_columns([col for col in dataset.column_names if col not in ['input_ids', 'attention_mask', 'labels']])
+        return encoded_dataset
 
-        # Creating an extra test set from the selected data split
-        else:
-            N = len(dataset) 
-            dataset_val = dataset.select(np.arange(0, k)) # val_size = k_val
-            dataset_test = dataset.select(np.arange(k, N)) # test_size = N - k_val
-            if self.dataset_name in ["CodeTask-CL", "the-vault-function"]:
-                dataloaders_val_test = []
-                for dataset in [dataset_val, dataset_test]:
-                    encoded_dataset = dataset.map(lambda x: self.preprocess_function(x,
-                                                                                    task,
-                                                                                    max_length=max_length,
-                                                                                    ),
-                                                                                    batched=False,
-                                                                                    load_from_cache_file=True
-                                                                                    )
-                    encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
-                    encoded_dataset = encoded_dataset.remove_columns([col for col in dataset.column_names if col not in ['input_ids', 'attention_mask', 'labels']])
-                    dataloaders_val_test.append(encoded_dataset)
-
-                return dataloaders_val_test
-            elif self.dataset_name == "MultiPL-E":
-                dataset_val = dataset_val.remove_columns(["doctests", "original", "prompt_terminology"])
-                dataset_test = dataset_test.remove_columns(["doctests", "original", "prompt_terminology"])
-
-            return [dataset_val, dataset_test]
         
 def get_task_data_dict(train_ds_name, benchmark, task, tokenizer, seq_len, target_len, split_size_dict):
     ''' return:
-    - tasks_data_dict: dict(task_name: {'lora_id': int, 'task_index': int, 'train': Dataloader, 'valid':Dataset, 'test':Dataset})
+    - tasks_data_dict: {'train':Dataset, 'valid':Dataset, 'test':Dataset})
     '''
     task_data_dict = {}
     source_len_codetask = {'CodeTrans':320, 'CodeSearchNet':256, 'BFP':130, 'CONCODE':320}
     target_len_codetask = {'CodeTrans':256, 'CodeSearchNet':128, 'BFP':120, 'CONCODE':150}
+    split_dict = {'train':'train', 'test':'test', 'valid':'validation'}
     if benchmark == "CodeTask-CL":
         seq_len = source_len_codetask[task]
         target_len = target_len_codetask[task]
 
-    for split in split_size_dict.keys():
-        if split == "train":
-            data_params = {
-                'task': task,
-                'batch_size': split_size_dict['train']['batch_size'],
-                'max_length': seq_len,
-                'target_len': target_len,
-            }
+    for s in split_size_dict.keys():
+        if s == 'train':
+            ds_name = train_ds_name
+        else:
+            ds_name = benchmark
+        split = split_dict[s]
+        data_params = {
+            'task': task,
+            'batch_size': split_size_dict[s]['batch_size'],
+            'max_length': seq_len,
+            'target_len': target_len,
+        }
 
-            ds_train = T5Dataset(train_ds_name, tokenizer)
+        ds_train = T5Dataset(ds_name, tokenizer)
 
-            # Load dataloaders
-            dataloader_train = ds_train.get_final_ds(**data_params,
-                                                k=split_size_dict['train']['size'],
-                                                split='train')
-            task_data_dict['train'] = dataloader_train
+        # Load dataloaders
+        ds = ds_train.get_final_ds(**data_params,
+                                            k=split_size_dict[s]['size'],
+                                            split=split)
+        task_data_dict[s] = ds
 
-        if split == "valid" or split == "test":
-            ds_val_test = T5Dataset(benchmark, tokenizer)
-
-            if benchmark == 'MultiPL-E':
-                data_params['batch_size'] = 1
-            else:
-                data_params['batch_size'] = split_size_dict[split]['batch_size']
-            dataset_val, dataset_test = ds_val_test.get_final_ds(
-                **data_params,
-                root_ds_eval=None,
-                k=split_size_dict['valid']['size'] if split_size_dict.get('valid') else 100,
-                split='test',
-                k_test=split_size_dict['test']['size'] if split_size_dict.get('test') else -1
-            )
-            if split == "valid":
-                task_data_dict['valid'] = dataset_val
-            else:
-                task_data_dict['test'] = dataset_test
-        print(f"Data for task {task} loaded: [{list(task_data_dict.keys())}], target length: {target_len}")
+        print(f"{len(ds)} samples for task {task}, split {split} loaded, source length: {seq_len}, target length: {target_len}")
 
     return task_data_dict
 
