@@ -90,6 +90,7 @@ def main(args):
         name=model_name+"-"+"CodeTask-CL"+"-"+str(service_id)+"-"+task,
         reinit=True # Allows running the function multiple times in the same session
     )
+    print(f"CUDA available: {torch.cuda.is_available()}")
 
     checkpoint_dir = os.path.join("./checkpoint_files", model_name+"-"+"CodeTask-CL", str(service_id) + "-" + task)
     print(f"output_dir: {checkpoint_dir}")
@@ -191,6 +192,7 @@ def main(args):
         report_to=["wandb"],
         resume_from_checkpoint=resume_from_checkpoint,
     )
+    print(f"Training args device: {training_args.device}")
     
     label_pad_token_id = -100 if ignore_pad_token_for_loss else tokenizer.pad_token_id
     data_collator = DataCollatorForSeq2Seq(
