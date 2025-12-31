@@ -39,6 +39,7 @@ from safetensors.torch import load_file as safe_load, save_file as safe_save
 set_seed(42)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
 def _load_checkpoint(path):
     """Helper function to safely load LoRA weights."""
