@@ -181,10 +181,9 @@ class T5Dataset:
                             return_tensors="pt")
 
         dict_final = {
-            "source_ids": source["input_ids"].squeeze(0),
-            "source_mask": source["attention_mask"].squeeze(0),
-            "target_ids": target["input_ids"].squeeze(0),
-            "target_mask": target["attention_mask"].squeeze(0),
+            "input_ids": source["input_ids"].squeeze(0),
+            "attention_mask": source["attention_mask"].squeeze(0),
+            "labels": target["input_ids"].squeeze(0),
         }
         return dict_final
 
@@ -256,9 +255,9 @@ class T5Dataset:
                                                                             split_seed=seed,
                                                                             ),
                                                                             batched=False,
+                                                                            load_from_cache_file=False,
                                                                             )
-        encoded_dataset.set_format(type='torch', columns=['source_ids', 'source_mask',
-                                                              'target_ids', 'target_mask'])
+        encoded_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
         return encoded_dataset
     
 def get_task_data_dict(task, tokenizer, batch_size, splits=['train', 'validation', 'test']):
