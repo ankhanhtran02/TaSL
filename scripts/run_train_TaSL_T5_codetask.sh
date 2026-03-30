@@ -2,7 +2,9 @@
 
 begin_id=0
 export CUDA_VISIBLE_DEVICES=0
-
+export WANDB_API_KEY=wandb_v1_PSYwiv7NgiYBagpUTCO2kTWcgyE
+export WANDB_ENTITY=caovdongg18-cl4code
+export WANDB_PROJECT=tasl_t5_codetask
 for ((ORDER=$begin_id; ORDER<7; ORDER++))
 do
 
