@@ -15,6 +15,8 @@ Replace the corresponding files in the Transformers package with `trainer.py` an
 Change directory to root:
 ```
 cp -i /workspace/TaSL/trainer_seq2seq.py /venv/TaSL/lib/python3.8/site-packages/transformers/trainer_seq2seq.py
+
+cp -i /workspace/TaSL/trainer.py /venv/TaSL/lib/python3.8/site-packages/transformers/trainer.py
 ```
 
 Export Wandb API key as environment variable:
