@@ -195,7 +195,7 @@ def lora_averaging(checkpoint_name, present_thresholds, previous_thresholds, dat
 def train(
     # model/data params
     dataset_name: str = "CodeTask-CL", # 1 - 5 
-    task_list: List[str] = ["CONCODE", "CodeTrans", "CodeSearchNet", "BFP"],
+    task_list: List[str] = ['CONCODE', 'CodeTrans', 'CodeSearchNet', 'BFP', 'TheVault_Csharp', 'KodCode', 'RunBugRun', 'CoST'],
     service_begin_id: int = 1, #
     checkpoint_name: str = "codet5-small-CodeTask-CL", #
     select_thresholds: float = -1, # 

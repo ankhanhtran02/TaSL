@@ -117,19 +117,13 @@ def main(args):
     
 
     task_data_dict = get_task_data_dict(
-        train_ds_name="CodeTask-CL",
-        benchmark="CodeTask-CL",
         task=task,
         tokenizer=tokenizer,
-        seq_len=max_input_length,
-        target_len=max_target_length,
-        split_size_dict={
-            "train": {"size": args.train_size, "batch_size": args.train_batch_size},
-            "valid": {"size": args.val_size, "batch_size": args.eval_batch_size},
-        }
+        splits=['train', 'validation'],
+        batch_size=args.train_batch_size
     )
     train_data = task_data_dict['train']
-    val_data = task_data_dict['valid']
+    val_data = task_data_dict['validation']
     print(f"train_data: {train_data}")
     print(f"val_data: {val_data}")    
 
@@ -175,8 +169,8 @@ def main(args):
     training_args = Seq2SeqTrainingArguments(
         evaluation_strategy = "epoch",
         save_strategy="epoch",
-        learning_rate = 3e-4,
-        warmup_steps=50,
+        learning_rate = 1e-4,
+        warmup_ratio=0.01,
         per_device_train_batch_size = args.train_batch_size,
         per_device_eval_batch_size = args.eval_batch_size,
         weight_decay = 0.01,
@@ -230,16 +224,11 @@ def main(args):
     for task_id in range(service_id + 1):
         eval_task = dataset_order[task_id]
         eval_dataset = get_task_data_dict(
-            train_ds_name="CodeTask-CL",
-            benchmark="CodeTask-CL",
             task=eval_task,
             tokenizer=tokenizer,
-            seq_len=max_input_length,
-            target_len=max_target_length,
-            split_size_dict={
-                "test": {"size": -1, "batch_size": args.eval_batch_size},
-            }
-        )["test"]
+            splits=['validation'],
+            batch_size=args.eval_batch_size
+        )["validation"]
         fname = f"test_{eval_task}_train_{task}"
         calc_metrics = compute_metrics_wrapper(tokenizer, fname, output_dir)
         trainer.compute_metrics = calc_metrics
@@ -303,7 +292,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--ignore_pad_token_for_loss", default=True, type=bool)
 
-    parser.add_argument("--model_path", type=str, default="Salesforce/codet5-small", help="Path to the base model")
+    parser.add_argument("--model_path", type=str, default="Salesforce/codet5p-770m", help="Path to the base model")
     parser.add_argument("--service_begin_id", type=int, default=0, help="Starting service ID for continual learning")
     parser.add_argument("--num_epochs", type=int, default=2, help="Number of training epochs")
     
@@ -313,11 +302,11 @@ if __name__ == "__main__":
     parser.add_argument("--max_input_length", type=int, default=320, help="Maximum input sequence length")
     parser.add_argument("--max_target_length", type=int, default=256, help="Maximum target sequence length")
     
-    parser.add_argument("--task_list", nargs="+", type=str, default=[], help="List of tasks for continual learning (provide one or more tasks)")
+    parser.add_argument("--task_list", nargs="+", type=str, default=['CONCODE', 'CodeTrans', 'CodeSearchNet', 'BFP', 'TheVault_Csharp', 'KodCode', 'RunBugRun', 'CoST'], help="List of tasks for continual learning (provide one or more tasks)")
     parser.add_argument("--train_size", type=int, default=-1, help="Training dataset size")
-    parser.add_argument("--val_size", type=int, default=100, help="Validation dataset size")
-    parser.add_argument("--train_batch_size", type=int, default=1, help="Training batch size per device")
-    parser.add_argument("--eval_batch_size", type=int, default=1, help="Evaluation batch size per device")
+    parser.add_argument("--val_size", type=int, default=2000, help="Validation dataset size")
+    parser.add_argument("--train_batch_size", type=int, default=16, help="Training batch size per device")
+    parser.add_argument("--eval_batch_size", type=int, default=16, help="Evaluation batch size per device")
 
     args = parser.parse_args()
     print(
