@@ -14,8 +14,8 @@ do
         --model_path Salesforce/codet5p-770m \
         --num_epochs 3 \
         --service_begin_id=${ORDER} \
-        --train_batch_size 16 \
-        --eval_batch_size 16 \
+        --train_batch_size 8 \
+        --eval_batch_size 8 \
 
     wait
 
